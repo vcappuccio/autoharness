@@ -119,7 +119,8 @@ def child_env(run_id, root, *, base_env=None):
 
 def _spawn_error(proc, argv):
     """Return bounded, redacted child diagnostics safe for the run account."""
-    stderr = redact.redact(str(proc.stderr or "")).strip()[-2000:]
+    # `claude -p` reports some failures (an expired login, for one) on stdout and leaves stderr empty
+    stderr = redact.redact(str(proc.stderr or "").strip() or str(proc.stdout or "")).strip()[-2000:]
     return {
         "argv0": redact.redact(str(argv[0])) if argv else None,
         "returncode": proc.returncode,
