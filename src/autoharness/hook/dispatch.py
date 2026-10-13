@@ -78,14 +78,22 @@ def _is_reflector(event):
     return at == config.REFLECTOR_AGENT or at.endswith(":reflector")
 
 
+def _detach_kwargs():
+    # start_new_session is POSIX-only and silently ignored on Windows; there a hidden console in its
+    # own process group is what keeps the job off the hook's console and its Ctrl+C.
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
 def _detached_launch(transcript_path, session_id, run_id, roots):
     try:
         subprocess.Popen(  # host-detach: fire-and-forget so the Stop hook returns immediately
             [sys.executable, "-m", "autoharness.hook.spawn",
              str(transcript_path), str(session_id), run_id,
              str(roots[layer.PROJECT]), str(roots[layer.GLOBAL])],
-            start_new_session=True, stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **_detach_kwargs(),
         )
     except OSError as exc:
         return {"error": f"detached_launch failed: {type(exc).__name__}: {exc}"}
@@ -103,8 +111,8 @@ def _consolidate_launch(run_id, roots):
     subprocess.Popen(  # host-detach: same fire-and-forget as reflection; the curator reads the library, not the transcript
         [sys.executable, "-m", "autoharness.hook.spawn", "--curate", run_id,
          str(roots[layer.PROJECT]), str(roots[layer.GLOBAL])],
-        start_new_session=True, stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **_detach_kwargs(),
     )
 
 

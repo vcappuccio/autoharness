@@ -1,16 +1,16 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/src python3 -m autoharness.hook.dispatch" } ] }
+      { "hooks": [ { "type": "command", "command": "python3 -X utf8 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\"" } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/src python3 -m autoharness.hook.dispatch" } ] }
+      { "hooks": [ { "type": "command", "command": "python3 -X utf8 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\"" } ] }
     ],
     "PreToolUse": [
-      { "hooks": [ { "type": "command", "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/src python3 -m autoharness.hook.dispatch" } ] }
+      { "hooks": [ { "type": "command", "command": "python3 -X utf8 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\"" } ] }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/src python3 -m autoharness.hook.dispatch" } ] }
+      { "hooks": [ { "type": "command", "command": "python3 -X utf8 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\"" } ] }
     ]
   }
 }

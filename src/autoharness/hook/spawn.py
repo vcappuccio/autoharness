@@ -90,7 +90,7 @@ FORK_INSTRUCTION = (
 
 def build_fork_command(*, session_id, claude_bin):
     return [claude_bin, "-p", "--resume", str(session_id), "--fork-session",
-            "--dangerously-skip-permissions"]
+            "--max-turns", str(config.CHILD_MAX_TURNS), "--dangerously-skip-permissions"]
 
 
 def build_fork_prompt(index, spec):
@@ -105,7 +105,8 @@ def build_command(*, agent, claude_bin):
     # (Read/Grep/Glob/stage_skill) + the top-level PreToolUse write backstop, not by the prompt.
     # (live e2e: a reflector's real stage_skill call gets blocked by the permission gate and can only
     # "narrate"; only with this flag does it land.)
-    return [claude_bin, "-p", "--agent", agent, "--dangerously-skip-permissions"]
+    return [claude_bin, "-p", "--agent", agent, "--max-turns", str(config.CHILD_MAX_TURNS),
+            "--dangerously-skip-permissions"]
 
 
 def child_env(run_id, root, *, base_env=None):
@@ -126,9 +127,47 @@ def _spawn_error(proc, argv):
     }
 
 
+TIMEOUT_RETURNCODE = 124  # coreutils `timeout` convention; never a code the child itself returns
+LAUNCH_RETURNCODE = 127   # shell convention for "command not found"
+
+
+def _kill_tree(proc):
+    """Stop the child and everything under it. On Windows the child is usually `claude.cmd`, so
+    killing the pid alone would end cmd.exe and leave the node process it started running."""
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                       capture_output=True, check=False)
+    else:
+        proc.kill()
+
+
+def _run_bounded(argv, env, bundle, timeout):
+    """subprocess.run with a deadline that reaches the whole process tree, as a CompletedProcess."""
+    flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
+    try:
+        proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                                errors="replace", env=env, **flags)
+    except OSError as exc:  # no such executable: an account entry, not an unseen traceback
+        return subprocess.CompletedProcess(argv, LAUNCH_RETURNCODE, "",
+                                           f"could not start child: {type(exc).__name__}: {exc}")
+    try:
+        out, err = proc.communicate(bundle, timeout=timeout)
+        return subprocess.CompletedProcess(argv, proc.returncode, out, err)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        try:
+            out, err = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            out, err = "", ""
+        note = f"autoharness: child exceeded {timeout}s and was stopped"
+        return subprocess.CompletedProcess(argv, TIMEOUT_RETURNCODE, out,
+                                           f"{err or ''}\n{note}".strip())
+
+
 def _detached_spawn(argv, env, bundle):
     """Run the reflector child to completion; report a crash on stderr instead of discarding it."""
-    proc = subprocess.run(argv, input=bundle, text=True, env=env, capture_output=True, check=False)
+    proc = _run_bounded(argv, env, bundle, config.CHILD_TIMEOUT_S)
     if proc.returncode != 0:
         error = _spawn_error(proc, argv)
         print(f"reflector child {error['argv0']} exited {proc.returncode}: "

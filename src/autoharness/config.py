@@ -6,6 +6,7 @@ values. Overridable via AUTOHARNESS_* env — for the e2e runbook to shrink the 
 capacity contention fire within a short session); defaults fall back to the placeholders.
 """
 import os
+import shutil
 import warnings
 from pathlib import Path
 
@@ -107,7 +108,12 @@ REFLECTOR_CARRIER = os.environ.get("AUTOHARNESS_CARRIER", "bundle")
 
 REFLECTOR_AGENT = "autoharness:reflector"  # the --agent reference for spawn (plugin namespace, Phase 0 resolution pending live test)
 CURATOR_AGENT = "autoharness:curator"      # the --agent reference for the periodic consolidation pass (same spawn chain as reflector)
-CLAUDE_BIN = "claude"                       # the child-session executable for spawn; PATH resolution, overridable in tests
+# the child-session executable for spawn, overridable in tests. Resolved through PATHEXT because an
+# npm install on Windows ships `claude.cmd`, and CreateProcess only ever completes a bare name to `.exe`.
+CLAUDE_BIN = shutil.which("claude") or "claude"
+# hard bounds on one child session: nothing else stops a reflector or curator that never ends its turn.
+CHILD_TIMEOUT_S = max(1, _int_env("AUTOHARNESS_CHILD_TIMEOUT_S", 600))
+CHILD_MAX_TURNS = max(1, _int_env("AUTOHARNESS_CHILD_MAX_TURNS", 30))
 RUN_ID_ENV = "AUTOHARNESS_RUN_ID"           # spawn injects the intent-queue run_id into the child session via env (read by stage_skill)
 # The queue for intents staged from a live user session (/learn, or the model acting on its own).
 # spawn injects a run id into every child it launches and drains that run when the child exits; a

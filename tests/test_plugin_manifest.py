@@ -20,7 +20,7 @@ def test_hooks_route_all_events_to_dispatch():
     for groups in h.values():
         for group in groups:
             for hook in group["hooks"]:
-                assert "autoharness.hook.dispatch" in hook["command"]
+                assert "bin/hook.py" in hook["command"]
     assert (ROOT / "src/autoharness/hook/dispatch.py").exists()
 
 
@@ -37,7 +37,7 @@ def test_pretooluse_backstops_reflector_writes():
     # S1/S3: the reflector write deny is a top-level PreToolUse backstop (not agent frontmatter),
     # so the catch-all group must be the one carrying dispatch — routing is dispatch's job.
     pre = _load("hooks/hooks.json")["hooks"]["PreToolUse"]
-    assert any("autoharness.hook.dispatch" in hook["command"]
+    assert any("bin/hook.py" in hook["command"]
                for group in pre for hook in group["hooks"])
 
 
